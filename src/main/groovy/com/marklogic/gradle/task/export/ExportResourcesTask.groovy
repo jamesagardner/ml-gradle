@@ -16,6 +16,7 @@ class ExportResourcesTask extends MarkLogicTask {
 		String filePropName = "propertiesFile"
 		String prefixPropName = "prefix"
 		String regexPropName = "regex"
+		String triggersDatabase = getAppConfig().getTriggersDatabaseName()
 
 		String includeTypesPropName = "includeTypes"
 		String includeTypes = null
@@ -34,11 +35,13 @@ class ExportResourcesTask extends MarkLogicTask {
 		} else if (getProject().hasProperty(prefixPropName)) {
 			String prefix = getProject().property(prefixPropName)
 			PrefixResourceSelector selector = new PrefixResourceSelector(prefix)
+			selector.setTriggersDatabase(triggersDatabase)
 			selector.setIncludeTypesAsString(includeTypes)
 			export(selector)
 		} else if (getProject().hasProperty(regexPropName)) {
 			String regex = getProject().property(regexPropName)
 			RegexResourceSelector selector = new RegexResourceSelector(regex)
+			selector.setTriggersDatabase(triggersDatabase)
 			selector.setIncludeTypesAsString(includeTypes)
 			export(selector)
 		} else {
@@ -53,15 +56,32 @@ class ExportResourcesTask extends MarkLogicTask {
 		}
 		println "Exporting resources to: " + path
 
-		ExportedResources resources = new Exporter(getManageClient()).select(selector).export(path)
+		Exporter exporter
+		if (project.hasProperty("mlGroupName")) {
+			String group = project.property("mlGroupName")
+			println "Will export servers and tasks in group: " + group
+			exporter = new Exporter(getManageClient(), group)
+		} else {
+			exporter = new Exporter(getManageClient())
+		}
+
+		ExportedResources resources = exporter
+			.select(selector)
+			.withTriggersDatabase(getAppConfig().getTriggersDatabaseName())
+			.export(path)
+
 		println "Exported files:"
-		for (File f : resources.getFiles()) {
-			println f.getAbsolutePath()
+		if (resources.getFiles() != null) {
+			for (File f : resources.getFiles()) {
+				println f.getAbsolutePath()
+			}
 		}
 
 		println "Export messages:"
-		for (String s : resources.getMessages()) {
-			println s
+		if (resources.getMessages() != null) {
+			for (String s : resources.getMessages()) {
+				println s
+			}
 		}
 	}
 }
